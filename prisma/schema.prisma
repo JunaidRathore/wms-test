@@ -31,6 +31,7 @@ model Company {
   updatedAt DateTime @updatedAt
   items     Item[]
   users     User[]
+  orders    Order[]  // Added this line
 
   @@index([code])
 }
@@ -47,6 +48,7 @@ model Item {
   company      Company       @relation(fields: [companyId], references: [id])
   stocks       Stock[]
   transactions Transaction[]
+  orderItems   OrderItem[]   // Added this line
 
   @@unique([companyId, sku])
   @@unique([companyId, barcode])
@@ -69,22 +71,22 @@ model Stock {
 }
 
 model Transaction {
-  id             String    @id @default(cuid())
+  id             String        @id @default(cuid())
   quantity       Int
   type           String    // ADD, REMOVE, MOVE
-  status         String    @default("COMPLETED") // Add this line
-  createdAt      DateTime  @default(now())
+  status         String        @default("COMPLETED")
+  createdAt      DateTime      @default(now())
   undoneAt       DateTime?
   itemId         String
   fromLocationId String?
   toLocationId   String?
   userId         String?
   putawayBatchId String?
-  fromLocation   Location? @relation("FromLocation", fields: [fromLocationId], references: [id])
-  item           Item      @relation(fields: [itemId], references: [id])
+  fromLocation   Location?     @relation("FromLocation", fields: [fromLocationId], references: [id])
+  item           Item          @relation(fields: [itemId], references: [id])
   putawayBatch   PutawayBatch? @relation(fields: [putawayBatchId], references: [id])
-  toLocation     Location? @relation("ToLocation", fields: [toLocationId], references: [id])
-  user           User?     @relation(fields: [userId], references: [id])
+  toLocation     Location?     @relation("ToLocation", fields: [toLocationId], references: [id])
+  user           User?         @relation(fields: [userId], references: [id])
 
   @@index([itemId])
   @@index([fromLocationId])
@@ -94,15 +96,17 @@ model Transaction {
 }
 
 model User {
-  id           String        @id @default(cuid())
-  username     String        @unique
-  passwordHash String
-  role         String        // Changed from UserRole enum to String
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  companyId    String?
-  transactions Transaction[]
-  company      Company?      @relation(fields: [companyId], references: [id])
+  id             String        @id @default(cuid())
+  username       String        @unique
+  passwordHash   String
+  role           String    // Changed from UserRole enum to String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  companyId      String?
+  transactions   Transaction[]
+  company        Company?      @relation(fields: [companyId], references: [id])
+  pickedOrders   Order[]       @relation("PickedBy")
+  createdOrders  Order[]       @relation("CreatedBy")
 
   @@index([username])
   @@index([companyId])
@@ -118,4 +122,37 @@ model PutawayBatch {
   transactions Transaction[]
 
   @@index([locationId])
+}
+
+model Order {
+  id          String       @id @default(cuid())
+  orderNumber String       @unique
+  status      String       @default("PENDING") // PENDING, PICKING, COMPLETED, CANCELLED
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  orderItems  OrderItem[]
+  pickedBy    User?        @relation("PickedBy", fields: [pickedById], references: [id])
+  pickedById  String?
+  createdBy   User         @relation("CreatedBy", fields: [createdById], references: [id])
+  createdById String
+  companyId   String
+  company     Company      @relation(fields: [companyId], references: [id])
+
+  @@index([orderNumber])
+  @@index([status])
+  @@index([companyId])
+}
+
+model OrderItem {
+  id           String    @id @default(cuid())
+  quantity     Int
+  orderId      String
+  itemId       String
+  order        Order     @relation(fields: [orderId], references: [id])
+  item         Item      @relation(fields: [itemId], references: [id])
+  pickLocation String?   // Will be filled by the system based on FIFO
+  status       String    @default("PENDING") // PENDING, PICKED, CANCELLED
+
+  @@index([orderId])
+  @@index([itemId])
 }
